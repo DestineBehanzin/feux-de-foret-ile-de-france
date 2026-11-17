@@ -11,10 +11,10 @@ Quatre questions dont la réponse aiderait la direction à trancher.
 > [!test] Test
 > Le test : si la réponse est X, la direction fait A ; si elle est Y, elle fait B. Si A et B sont identiques, ce n'est pas une question analytique pertinente.
 
-1.
-2.
-3.
-4.
+1.Quels sont les indicateurs de feux de forêt?
+2. Quels sont les moyens mis en place pour mieux lutter contre les départs de feu?
+3. Quels sont les niveaux d'indice disponible? Il y a t-il des données disponibles?
+4. Ou peut- on avoir les données sur les indices?
 
 ## 2. Les termes inconnus
 
