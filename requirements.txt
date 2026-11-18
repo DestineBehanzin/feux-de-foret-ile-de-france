@@ -1,0 +1,18 @@
+# Orchestration
+dagster==1.13.30
+dagster-webserver==1.13.30
+dagster-postgres==0.29.30
+dagster-dbt==0.29.30
+
+# Transformations SQL
+dbt-core==1.11.0
+dbt-postgres==1.11.0
+
+# PostgreSQL et ingestion
+psycopg[binary]>=3.2,<4
+SQLAlchemy>=2,<3
+requests>=2.32,<3
+
+# Traitement et tests
+pandas>=2.2,<4
+pytest>=8,<10
