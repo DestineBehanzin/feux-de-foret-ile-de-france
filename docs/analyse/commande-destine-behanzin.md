@@ -10,7 +10,7 @@ Quatre questions dont la réponse aiderait la direction à trancher.
 > [!test] Test
 > Le test : si la réponse est X, la direction fait A ; si elle est Y, elle fait B. Si A et B sont identiques, ce n'est pas une question analytique pertinente.
 
-1.Quels sont les moyens humains comme financiers dont dispose le SDIS de Seine-et-marne pour lutter au mieux contre les départs de feu?
+1.Quels sont les moyens dont dispose le SDIS de Seine-et-marne pour lutter au mieux contre les départs de feu?
 2.Ou sont concentrés ces moyens à ce jour?
 3.Comment calcule-t-on l'indice?
 4.Quelle est la marge de l'indice actuel?
@@ -44,7 +44,19 @@ Pour chaque question, la donnée qu'il vous faudrait idéalement pour répondre.
 
 | Question | Donnée idéale | Grain (une ligne = ?) | Période | Fraîcheur | Emprise géographique |
 |---|---|---|---|---|---|
-| 1 |Données des moyens humains | | 2026 ou les années précédentes| |Seine et marne, dans les autres départements autour et sur le territoire nationale  |
+| 1 |Données des moyens | | 2026 ou les années précédentes| |Seine et marne, dans les autres départements autour et sur le territoire nationale  |
 | 2 |Données des concentrations des moyens | |2026 ou les années précédentes | | Seine et marne, dans les autres départements autour et sur le territoire nationale|
 | 3 |Calcul de l'indice | |2026 ou les années précédentes | |Seine et marne, dans les autres départements autour et sur le territoire nationale |
 | 4 |Indice , et ses marges | |2026 ou les années précédentes | |Seine et marne, dans les autres départements autour et sur le territoire nationale |
+
+
+Section 5
+| Question | Source | Dégré | Décision|
+|---|---|---|---|
+|Q1: Quels sont les moyens dont dispose le SDIS de Seine-et-marne pour lutter au mieux contre les départs de feu?|Interventions SDIS|Partiel: Grace aux colonnes "Secours en piscines ou eaux intérieurs, Secours en mer, Secours a victime, Secours a personnes, Protectioon des biens, opérations diverses et Total Interventions", On connait toutes le nombre d'interventions des SDIS En Ile de france. Grace a toutes les autres clonnes on connait le nombre de départs de feux et leurs sources.|Collecter|
+|Q1: Quels sont les moyens dont dispose le SDIS de Seine-et-marne pour lutter au mieux contre les départs de feu?|Les Plans de Protection des Forêts Contre les Incendies (PPFCI/PDPFCI)|Partiel: La période réellement couverte par les données étant de 10ans, elle permet de répondre aux moyens dont on dispose uniquement de 2024-2034|Collecter|
+|Q2: Ou sont concentrés ces moyens à ce jour?|Interventions SDIS|Complet: Grace aux colonnes "Secours en piscines ou eaux intérieurs, Secours en mer, Secours a victime, Secours a personnes, Protection des biens, opérations diverses et Total Interventions", On connait toutes le nombre d'interventions des SDIS En Ile de france. Grace a toutes les autres clonnes on connait le nombre de départs de feux et leurs sources. Donc on peut direcetement savoir ou sont concnetrés les moyens|Collecter|
+|Q2: Ou sont concentrés ces moyens à ce jour?|Les Plans de Protection des Forêts Contre les Incendies (PPFCI/PDPFCI)|Complet: On connait les différents moyens et on connait les endroit ou ils sotn concenctrés grace aux différentes poltiques. C'est un article dont les colonnes seront a etre crées et remplit plus tard|Collecter|
+|Q3: Comment calcule-t-on l'indice?|Météo des forêts|Partiel: on connait les différents indices mais pas le moyen de calcul de ses indices.|Approximer|
+|Q4: Quelle est la marge de l'indice actuel?|Météo des forêts|Inconnu|Renoncer|
+
