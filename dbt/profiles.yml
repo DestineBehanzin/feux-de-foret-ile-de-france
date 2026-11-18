@@ -1,0 +1,12 @@
+movies_warehouse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'postgres') }}"
+      port: 5432
+      user: "{{ env_var('POSTGRES_USER', 'pipeline') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'pipeline_dev_only') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'warehouse') }}"
+      schema: analytics
+      threads: 4
