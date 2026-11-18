@@ -1,0 +1,15 @@
+name: movies_warehouse
+version: "1.0.0"
+config-version: 2
+profile: movies_warehouse
+model-paths: ["models"]
+test-paths: ["tests"]
+clean-targets: ["target", "dbt_packages"]
+models:
+  movies_warehouse:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
