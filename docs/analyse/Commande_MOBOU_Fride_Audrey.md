@@ -36,7 +36,33 @@ Pour chaque question, la donnée qu'il vous faudrait idéalement pour répondre.
 
 | Question | Donnée idéale | Grain (une ligne = ?) | Période | Fraîcheur | Emprise géographique |
 |---|---|---|---|---|---|
-| 1 | | | | | |
-| 2 | | | | | |
-| 3 | | | | | |
-| 4 | | | | | |
+| 1 | Données des résultats du SDIS|2010-2025 |2026 | |Par département sur toute la métropole française |
+| 2 | Données de la météo des forets |2010-2025 |2026 | |Par département sur toute la métropole française |
+| 3 | Données de la météo des forets et données des dispositifs mis en place en fonction des indicateurs caractéristiques de cette météo et leurs résultats |2010-2025 |2026 | |Par département sur toute la métropole française |
+| 4 |Données des feu de forets et des caractéristiques des forets |2010-2025 |2026 | |Par département sur toute la métropole française |
+
+## 5. Confrontation aux sources
+
+### Matrice
+
+| Question | [BD Foret V2] | [Forets publiques] | [Statistqiues SDIS] | 
+|---|---|---|---|---|
+| 1 | Absent|Absent|Absent|complet mais inexploitable car on n'arrive à télécharger la source|
+
+| 4 | complet |Inconnu car documentation indisponible |  Inconnu|
+
+### Écarts avec la section 4
+
+Pour chaque question, comparez la donnée idéale (section 4) à la meilleure source disponible, critère par critère : écrivez « idéal → réel », ou « = » si les deux correspondent.
+
+| Question | Meilleure source | Grain | Période | Fraîcheur | Emprise |
+| -------- | ---------------- | ----- | ------- | --------- | ------- |
+| 1        |Statistiques SDIS |Inconnu|2012-2024|     2024  | Ile de France |
+
+| 4        | BD Foret V2      |Polygone de formation végétale → évènement de feu recherché|2006-2019|   Variable selon département    | Ile de france |
+
+### Décisions
+
+| Question | Ce qui manque | Décision | Pourquoi | Ce que la décision coûte |
+|---|---|---|---|---|
+| 4| | Les données météorologiques (température, humidité, vitesse du vent, précipitations), les données historiques de feux ainsi que la méthode de calcul de l'indice de risque incendie. La DC_BDForet_2-0 fournit uniquement les caractéristiques de la végétation (essences, peuplements, couvert forestier) / Collecter / La DC_BDForet_2-0 apporte une partie importante des facteurs explicatifs du risque de feu grâce aux variables ESSENCE, TFV et TFV_G11, mais elle ne permet pas à elle seule d'expliquer ou de recalculer l'indice de risque. Pour répondre correctement à la question, il est nécessaire de croiser cette source avec les données de la météo des forêts de Météo-France et les données historiques de départs de feux | Temps supplémentaire de recherche et d'intégration des données externes, mise en place de traitements de croisement spatial entre les données météorologiques, les feux observés et les caractéristiques des forêts. Cela augmente la complexité du pipeline mais améliore fortement la qualité de l'analyse.| 
