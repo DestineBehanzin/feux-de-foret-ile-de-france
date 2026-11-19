@@ -1,100 +1,87 @@
-# Stack Docker du pipeline de données
+# Pipeline de données sur les incendies de forêt
 
-Ce dépôt met en place l'infrastructure technique du pipeline.
+## Branche `feature/ingestion-csv`
 
-La stack contient :
+Cette branche étend le stack Docker initial avec une première chaîne d’ingestion CSV opérationnelle pour les données BDIFF sur les incendies de forêt.
 
-- PostgreSQL 17 pour le stockage des données et des métadonnées ;
-- Dagster Webserver pour superviser le pipeline ;
-- Dagster Daemon pour les planifications et traitements en arrière-plan ;
-- dbt Core pour les futures transformations SQL ;
-- Python 3.13 comme environnement d'exécution de Dagster et dbt ;
-- Docker Compose pour construire, connecter et démarrer les services.
+Le pipeline permet désormais de :
+
+- charger la configuration d’une source CSV depuis `config/sources.yml` ;
+- lire un fichier CSV volumineux ligne par ligne ;
+- gérer plusieurs encodages et un séparateur configurable ;
+- ignorer les lignes de métadonnées précédant l’en-tête ;
+- appliquer des contrôles de qualité propres aux données BDIFF ;
+- insérer les lignes valides dans PostgreSQL ;
+- conserver les lignes rejetées avec leur motif ;
+- journaliser chaque chargement ;
+- éviter la réinsertion des mêmes lignes ;
+- orchestrer et superviser l’exécution dans Dagster ;
+- archiver une copie du fichier traité.
+
+## Résultat du premier test
+
+Le fichier `Incendies.csv` a été matérialisé avec succès dans Dagster :
+
+| Indicateur | Résultat |
+|---|---:|
+| Fichiers traités | 1 |
+| Lignes lues | 2 541 |
+| Lignes insérées | 2 540 |
+| Lignes rejetées | 1 |
+| Taux de validation | 99,96 % |
+
+La ligne rejetée correspond à une commune absente à la position 5. Elle est conservée dans `audit.rejected_records` avec son numéro de ligne, son contenu brut et le motif du rejet.
+
+---
 
 ## Architecture
 
 ```text
-                         Docker Compose
-                               |
-               +---------------+---------------+
-               |               |               |
-               v               v               v
-          PostgreSQL      Dagster Web      Dagster Daemon
-          port interne       port 3000       planifications
-             5432
-               ^
-               |
-               +---------------+
-                               |
-                              dbt
-                      exécution ponctuelle
+Incendies.csv
+      |
+      v
+config/sources.yml
+      |
+      v
+Dagster - ingest_csv_sources
+      |
+      +--------------------------+
+      |                          |
+      v                          v
+Validation BDIFF          Journal d'audit
+      |                    audit.load_log
+      |
+      +---------------+
+      |               |
+      v               v
+Lignes valides     Lignes invalides
+raw.csv_records    audit.rejected_records
+      |
+      v
+Future couche dbt
+staging -> marts
+      |
+      v
+Power BI
 ```
 
+## Composants du stack
 
-## 1. Prérequis
-
-### Logiciels
-
-Installer les composants suivants :
-
-- Git ;
-- Docker Desktop avec le moteur Linux/WSL2 ;
-- Python 3.13 ;
-- PowerShell 7 ou Windows PowerShell.
-
-### Vérifier Docker
-
-Ouvrir Docker Desktop et attendre que le moteur soit démarré.
-
-```powershell
-docker --version
-docker compose version
-docker info
-```
-
-La commande `docker info` doit afficher une section `Server`.
-
-### Vérifier Python 3.13
-
-```powershell
-py -0p
-py -3.13 --version
-```
-
-Résultat attendu :
-
-```text
-Python 3.13.x
-```
-
-Si Python 3.13 n'est pas installé :
-
-```powershell
-winget install --id Python.Python.3.13 -e
-```
-
-Fermer et rouvrir PowerShell après l'installation.
+| Composant | Version ou rôle |
+|---|---|
+| PostgreSQL | 17 Alpine, données brutes et audit |
+| Dagster Webserver | Supervision et matérialisation des assets |
+| Dagster Daemon | Exécutions et automatisations en arrière-plan |
+| Python | 3.13 |
+| dbt Core | Future transformation `raw -> staging -> marts` |
+| Docker Compose | Construction et connexion des services |
 
 ---
 
-## 2. Récupérer le projet
-
-```powershell
-git clone URL_DU_DEPOT
-Set-Location NOM_DU_DEPOT
-```
-
-Vérifier le contenu :
-
-```powershell
-Get-ChildItem
-```
-
-Fichiers attendus :
+## Arborescence principale
 
 ```text
-pipeline_stack/
-├── .dockerignore
+.
 ├── .env.example
 ├── .gitignore
 ├── Dockerfile
@@ -102,447 +89,441 @@ pipeline_stack/
 ├── docker-compose.yml
 ├── requirements.txt
 ├── workspace.yaml
+├── config/
+│   └── sources.yml
 ├── dagster_home/
 │   └── dagster.yaml
+├── data/
+│   ├── incoming/
+│   │   └── .gitkeep
+│   ├── archive/
+│   │   └── .gitkeep
+│   └── rejected/
+│       └── .gitkeep
 ├── dbt/
 │   ├── dbt_project.yml
-│   └── profiles.yml
+│   ├── profiles.yml
+│   └── macros/
+│       └── generate_schema_name.sql
+├── sql/
+│   └── init/
+│       ├── 010_raw_csv_records.sql
+│       ├── 020_audit_load_log.sql
+│       └── 030_audit_rejected_records.sql
 └── src/
     └── pipeline/
-        ├── __init__.py
-        └── definitions.py
+        ├── definitions.py
+        ├── assets/
+        │   └── csv_assets.py
+        ├── config/
+        │   └── source_loader.py
+        ├── connectors/
+        │   └── csv_connector.py
+        ├── repositories/
+        │   └── csv_repository.py
+        └── validators/
+            └── bdiff_validator.py
 ```
 
 ---
 
-## 3. Créer l'environnement virtuel Python 3.13
+## 1. Prérequis
 
-L'environnement virtuel est utile pour les tests locaux. Docker possède son propre environnement Python indépendant.
+Installer et démarrer :
 
-### Supprimer un ancien environnement
+- Git ;
+- Docker Desktop avec le moteur Linux/WSL2 ;
+- PowerShell ;
+- Python 3.13 pour les tests locaux facultatifs.
 
-```powershell
-if (Test-Path ".\.venv") {
-    Remove-Item ".\.venv" -Recurse -Force
-}
-```
-
-### Créer le nouvel environnement
+Vérifier Docker :
 
 ```powershell
-py -3.13 -m venv .venv
+docker --version
+docker compose version
+docker info
 ```
 
-Vérifier sa version avant activation :
+Vérifier Python :
 
 ```powershell
-.\.venv\Scripts\python.exe --version
-```
-
-### Activer l'environnement
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
-
-Le terminal doit commencer par `(.venv)`.
-
-```powershell
-python --version
-Get-Command python
-```
-
-Le chemin doit pointer vers :
-
-```text
-pipeline_stack\.venv\Scripts\python.exe
+py -3.13 --version
 ```
 
 ---
 
-## 4. Installer les dépendances Python locales
+## 2. Récupérer le projet et la branche
 
 ```powershell
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -r requirements.txt
-python -m pip check
+git clone URL_DU_DEPOT
+Set-Location feux-de-foret-ile-de-france
+git switch feature/ingestion-csv
 ```
 
-Résultat attendu pour la dernière commande :
-
-```text
-No broken requirements found.
-```
-
-Tester les outils principaux :
+Si la branche distante existe uniquement sur GitHub :
 
 ```powershell
-python -c "import dagster, requests, sqlalchemy, psycopg; print('Imports Python OK')"
-dagster --version
-dbt --version
-pytest --version
+git fetch origin
+git switch --track origin/feature/ingestion-csv
 ```
 
 ---
 
-## 5. Configurer les variables d'environnement
+## 3. Configuration locale
 
-Le fichier `docker-compose.yml` utilise des variables et ne contient pas les valeurs locales directement.
-
-Créer `.env` à partir de l'exemple :
+Créer `.env` à partir de l’exemple :
 
 ```powershell
-Copy-Item ".\.env.example" ".\.env" -Force
+Copy-Item .\.env.example .\.env
 notepad .\.env
 ```
 
-Configuration minimale :
-
-```env
-# Docker Compose
-COMPOSE_PROJECT_NAME=pipeline-stack
-RESTART_POLICY=unless-stopped
-PIPELINE_DOCKERFILE=Dockerfile
-
-# PostgreSQL
-POSTGRES_IMAGE=postgres:17-alpine
-POSTGRES_CONTAINER_NAME=pipeline_postgres
-POSTGRES_DB=warehouse
-POSTGRES_USER=pipeline
-POSTGRES_PASSWORD=change_me
-POSTGRES_HOST=postgres
-POSTGRES_HOST_PORT=5433
-POSTGRES_CONTAINER_PORT=5432
-POSTGRES_VOLUME_NAME=pipeline_postgres_data
-POSTGRES_HEALTHCHECK_INTERVAL=5s
-POSTGRES_HEALTHCHECK_TIMEOUT=5s
-POSTGRES_HEALTHCHECK_RETRIES=12
-DATABASE_URL=postgresql+psycopg://pipeline:change_me@postgres:5432/warehouse
-
-# Dagster
-DAGSTER_WEBSERVER_CONTAINER_NAME=pipeline_dagster_webserver
-DAGSTER_DAEMON_CONTAINER_NAME=pipeline_dagster_daemon
-DAGSTER_HOME=/opt/dagster/dagster_home
-DAGSTER_HOST=0.0.0.0
-DAGSTER_HOST_PORT=3000
-DAGSTER_PORT=3000
-DAGSTER_WORKSPACE_PATH=/app/workspace.yaml
-DAGSTER_HEALTHCHECK_INTERVAL=20s
-DAGSTER_HEALTHCHECK_TIMEOUT=10s
-DAGSTER_HEALTHCHECK_RETRIES=10
-DAGSTER_HEALTHCHECK_START_PERIOD=45s
-
-# dbt
-DBT_CONTAINER_NAME=pipeline_dbt
-DBT_PROFILE=tools
-DBT_WORKING_DIR=/app/dbt
-DBT_PROFILES_DIR=/app/dbt
-
-# Réseau Docker
-DATA_NETWORK_NAME=pipeline_data_network
-DATA_NETWORK_DRIVER=bridge
-```
-
-### Choix du port PostgreSQL
-
-Le port interne de PostgreSQL reste `5432`.
-
-- utiliser `POSTGRES_HOST_PORT=5432` si le port est libre sur Windows ;
-- utiliser `POSTGRES_HOST_PORT=5433` si un autre PostgreSQL utilise déjà `5432`.
-
-La valeur `DATABASE_URL` doit continuer à utiliser `postgres:5432`, car Dagster et dbt communiquent avec PostgreSQL sur le réseau Docker interne.
-
-### Sécurité
-
-Le fichier `.env` ne doit jamais être poussé sur GitHub.
+Le vrai `.env` ne doit pas être versionné :
 
 ```powershell
 git check-ignore -v .env
 ```
 
-Résultat attendu : `.env` est ignoré par `.gitignore`.
+Variables CSV attendues :
+
+```env
+CSV_SOURCES_CONFIG=/app/config/sources.yml
+CSV_INCOMING_DIR=/app/data/incoming
+CSV_ARCHIVE_DIR=/app/data/archive
+CSV_REJECTED_DIR=/app/data/rejected
+CSV_DEFAULT_BATCH_SIZE=1000
+```
+
+`/app` est le répertoire interne des conteneurs Docker. Les correspondances sont définies dans `docker-compose.yml` :
+
+| Dossier Windows du projet | Chemin dans Dagster |
+|---|---|
+| `./config` | `/app/config` |
+| `./data/incoming` | `/app/data/incoming` |
+| `./data/archive` | `/app/data/archive` |
+| `./data/rejected` | `/app/data/rejected` |
+| `./src` | `/app/src` |
 
 ---
 
-## 6. Vérifier la configuration Docker Compose
+## 4. Configurer la source BDIFF
+
+Le fichier `config/sources.yml` contient :
+
+```yaml
+csv_sources:
+  - name: bdiff_incendies_2025
+    enabled: true
+    file_name: Incendies.csv
+    delimiter: ";"
+    encoding: "utf-8-sig"
+    fallback_encodings:
+      - "utf-8"
+      - "cp1252"
+      - "latin-1"
+    header_row: 3
+    skip_blank_rows: true
+    batch_size: 1000
+    archive_after_success: true
+    domain: bdiff
+    expected_column_count: 24
+    required_positions:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+```
+
+La ligne 3 contient les en-têtes. Les lignes 1 et 2 sont des métadonnées de l’export BDIFF.
+
+Le fichier CSV doit être placé ici :
+
+```text
+data/incoming/Incendies.csv
+```
+
+Le fichier source réel ne doit pas être poussé sur Git s’il est volumineux ou s’il doit rester local.
+
+---
+
+## 5. Contrôles de qualité BDIFF
+
+Le validateur contrôle notamment :
+
+- la présence des sept champs structurants ;
+- une année comprise entre 1900 et 2100 ;
+- le format du département ;
+- le format du code INSEE ;
+- la date de première alerte ;
+- les surfaces numériques et positives ou nulles ;
+- la nature de l’incendie ;
+- les compteurs de décès et de bâtiments détruits ;
+- la présence de 24 colonnes.
+
+Les formats de date acceptés incluent notamment :
+
+```text
+2025-01-01 01:08:00
+2025-01-01 01:08
+01/01/2025 01:08:00
+01/01/2025 01:08
+```
+
+Une ligne invalide n’interrompt pas le traitement complet. Elle est enregistrée dans `audit.rejected_records`.
+
+---
+
+## 6. Valider Docker Compose
 
 ```powershell
 docker compose config --quiet
+docker compose config --services
 ```
 
-Une sortie vide indique que la configuration est valide.
-
-Lister les services :
-
-```powershell
-docker compose --profile tools config --services
-```
-
-Résultat attendu :
+Services attendus :
 
 ```text
 postgres
 dagster-webserver
 dagster-daemon
-dbt
 ```
 
-Attention : afficher la configuration résolue peut révéler les valeurs de `.env`. Ne jamais versionner un fichier `compose-resolved.yml`.
-
----
-
-## 7. Construire l'image Python 3.13
-
-Le `Dockerfile` construit l'environnement Python utilisé dans les conteneurs Dagster et dbt.
-
-Première construction :
+Le service dbt est activé séparément avec son profil Compose :
 
 ```powershell
-docker compose --progress plain build --no-cache dagster-webserver
-```
-
-Construire les autres services en réutilisant le cache :
-
-```powershell
-docker compose build dagster-daemon dbt
-```
-
-Vérifier Python dans le conteneur :
-
-```powershell
-docker compose run --rm dagster-webserver python --version
-```
-
-Résultat attendu :
-
-```text
-Python 3.13.x
-```
-
-Tester les dépendances dans l'image :
-
-```powershell
-docker compose run --rm dagster-webserver `
-  python -c "import dagster, requests, sqlalchemy, psycopg; print('Image Dagster OK')"
+docker compose --profile forest_fire_warehouse config --services
 ```
 
 ---
 
-## 8. Démarrer PostgreSQL
+## 7. Construire et démarrer le stack
 
 ```powershell
-docker compose up -d postgres
-```
-
-Vérifier le service :
-
-```powershell
-docker compose ps postgres
-```
-
-Le statut doit devenir `healthy`.
-
-Tester PostgreSQL depuis son conteneur :
-
-```powershell
-docker compose exec postgres `
-  pg_isready -U pipeline -d warehouse
-```
-
-Résultat attendu :
-
-```text
-accepting connections
-```
-
-### Connexion depuis Windows
-
-Avec `POSTGRES_HOST_PORT=5433` :
-
-```text
-Hôte : localhost
-Port : 5433
-Base : warehouse
-Utilisateur : pipeline
-```
-
-Depuis les autres conteneurs :
-
-```text
-Hôte : postgres
-Port : 5432
-```
-
----
-
-## 9. Démarrer Dagster
-
-```powershell
-docker compose up -d dagster-webserver dagster-daemon
-```
-
-Vérifier l'état :
-
-```powershell
+docker compose build --no-cache
+docker compose up -d postgres dagster-webserver dagster-daemon
 docker compose ps
 ```
 
-Consulter les logs :
+États attendus :
 
-```powershell
-docker compose logs --tail 150 dagster-webserver dagster-daemon
-```
+- PostgreSQL : `healthy` ;
+- Dagster Webserver : `healthy` ;
+- Dagster Daemon : `Up`.
 
-Ouvrir l'interface :
+Dagster est accessible sur :
 
 ```text
 http://localhost:3000
 ```
 
-La définition Dagster de cette branche est volontairement vide :
+PostgreSQL est accessible depuis Windows sur :
 
-```python
-from dagster import Definitions
-
-
-defs = Definitions(assets=[])
+```text
+localhost:5433
 ```
 
-Le stack peut ainsi démarrer sans inclure d'ingestion CSV, API ou WFS.
+Entre conteneurs, PostgreSQL reste accessible sur :
 
----
-
-## 10. Tester dbt
-
-dbt appartient au profil Compose `tools` et ne reste pas actif en permanence.
-
-Afficher sa version :
-
-```powershell
-docker compose --profile tools run --rm dbt --version
-```
-
-Tester la configuration PostgreSQL :
-
-```powershell
-docker compose --profile tools run --rm `
-  dbt debug --profiles-dir /app/dbt
-```
-
-Les transformations seront exécutées plus tard avec :
-
-```powershell
-docker compose --profile tools run --rm `
-  dbt build --profiles-dir /app/dbt
-```
-
-Cette commande n'est utile que lorsque des modèles dbt existent.
-
----
-
-## 11. Démarrer le stack complet
-
-Une fois les tests unitaires réussis :
-
-```powershell
-docker compose up -d postgres dagster-webserver dagster-daemon
-```
-
-Ou simplement :
-
-```powershell
-docker compose up -d
-```
-
-Le service dbt n'est pas démarré par défaut à cause du profil `tools`.
-
-Vérifier :
-
-```powershell
-docker compose ps
+```text
+postgres:5432
 ```
 
 ---
 
-## 12. Arrêter le stack
+## 8. Initialiser PostgreSQL
 
-Arrêter et supprimer les conteneurs tout en conservant les données PostgreSQL :
+Les scripts de `sql/init` sont automatiquement exécutés uniquement lors de la création d’un volume PostgreSQL vide.
+
+Sur un volume existant, les exécuter manuellement :
+
+```powershell
+Get-Content .\sql\init\010_raw_csv_records.sql |
+    docker compose exec -T postgres `
+    psql -U pipeline -d warehouse
+
+Get-Content .\sql\init\020_audit_load_log.sql |
+    docker compose exec -T postgres `
+    psql -U pipeline -d warehouse
+
+Get-Content .\sql\init\030_audit_rejected_records.sql |
+    docker compose exec -T postgres `
+    psql -U pipeline -d warehouse
+```
+
+Tables attendues :
+
+```text
+raw.csv_records
+audit.load_log
+audit.rejected_records
+```
+
+Vérification :
+
+```powershell
+docker compose exec postgres `
+    psql -U pipeline -d warehouse `
+    -c "SELECT table_schema, table_name FROM information_schema.tables WHERE table_schema IN ('raw','audit') ORDER BY table_schema, table_name;"
+```
+
+---
+
+## 9. Tester les fichiers dans Dagster
+
+Vérifier la configuration :
+
+```powershell
+docker compose exec dagster-webserver `
+    sh -c "ls -la /app/config && cat /app/config/sources.yml"
+```
+
+Vérifier la source :
+
+```powershell
+docker compose exec dagster-webserver `
+    python -c "from pipeline.config.source_loader import load_csv_sources; print(load_csv_sources())"
+```
+
+Vérifier le CSV :
+
+```powershell
+docker compose exec dagster-webserver `
+    sh -c "ls -la /app/data/incoming"
+```
+
+Prétester la première ligne :
+
+```powershell
+docker compose exec dagster-webserver `
+    python -c "from pathlib import Path; from pipeline.connectors.csv_connector import iter_csv_rows; from pipeline.validators.bdiff_validator import validate_bdiff; row=next(iter_csv_rows(Path('/app/data/incoming/Incendies.csv'),delimiter=';',encoding='utf-8-sig',fallback_encodings=['utf-8','cp1252','latin-1'],header_row=3)); print(validate_bdiff(row[1],24,[1,2,3,4,5,6,7]))"
+```
+
+Résultat attendu :
+
+```text
+[]
+```
+
+---
+
+## 10. Lancer l’ingestion
+
+Dans Dagster :
+
+1. ouvrir `http://localhost:3000` ;
+2. ouvrir l’asset `ingest_csv_sources` ;
+3. cliquer sur **Materialize** ;
+4. suivre l’exécution dans **Events**.
+
+Métadonnées attendues pour le fichier de test :
+
+```text
+files: ["Incendies.csv"]
+rows_read: 2541
+rows_inserted: 2540
+rows_rejected: 1
+```
+
+---
+
+## 11. Vérifier le résultat
+
+### Journal d’audit
+
+```powershell
+docker compose exec postgres `
+    psql -U pipeline -d warehouse `
+    -c "SELECT pipeline_name, source_name, source_file, status, rows_read, rows_inserted, rows_rejected, started_at, completed_at, error_message FROM audit.load_log ORDER BY started_at DESC LIMIT 3;"
+```
+
+### Lignes valides
+
+```powershell
+docker compose exec postgres `
+    psql -U pipeline -d warehouse `
+    -c "SELECT source_name, COUNT(*) FROM raw.csv_records GROUP BY source_name;"
+```
+
+### Lignes rejetées
+
+```powershell
+docker compose exec postgres `
+    psql -U pipeline -d warehouse `
+    -c "SELECT source_file, source_row_number, reason FROM audit.rejected_records ORDER BY rejected_at DESC LIMIT 10;"
+```
+
+### Archivage
+
+```powershell
+Get-ChildItem .\data\archive
+```
+
+Le pipeline copie le fichier traité dans `data/archive` après une exécution réussie.
+
+---
+
+## 12. Idempotence
+
+Chaque ligne reçoit un hash SHA-256 calculé à partir de son contenu normalisé.
+
+La contrainte suivante évite les doublons du même fichier :
+
+```text
+source_name + source_file + row_hash
+```
+
+Une seconde matérialisation du même fichier doit lire les lignes, mais ne doit pas les insérer une seconde fois.
+
+---
+
+## 13. Sécurité et versionnement
+
+Ne pas pousser :
+
+- `.env` ;
+- `.venv/` ;
+- les caches Python `__pycache__/` et `*.pyc` ;
+- les logs Dagster ;
+- les fichiers CSV réels dans `data/incoming` ;
+- les copies de fichiers dans `data/archive` et `data/rejected` ;
+- les cibles dbt `target/` et `dbt_packages/`.
+
+Conserver uniquement les `.gitkeep` dans les dossiers `data`.
+
+Vérifier avant tout commit :
+
+```powershell
+git status --short
+git check-ignore -v .env
+git check-ignore -v .\data\incoming\Incendies.csv
+```
+
+---
+
+## 14. Arrêter le stack
+
+Conserver les données PostgreSQL :
 
 ```powershell
 docker compose down
 ```
 
-Arrêter les services sans supprimer les conteneurs :
-
-```powershell
-docker compose stop
-```
-
-Redémarrer :
-
-```powershell
-docker compose start
-```
-
-### Attention aux volumes
-
-La commande suivante supprime aussi le volume PostgreSQL :
+Ne pas utiliser la commande suivante si les données doivent être conservées :
 
 ```powershell
 docker compose down -v
 ```
 
-Ne pas l'utiliser si la base contient des données à conserver.
-
 ---
 
-## 13. Modifier `.env`
+## 15. Prochaines étapes
 
-Après une modification de port, de nom de conteneur ou d'identifiant PostgreSQL :
-
-```powershell
-docker compose up -d --force-recreate `
-  postgres dagster-webserver dagster-daemon
-```
-
-Un simple `restart` ne réinjecte pas toujours les nouvelles variables dans les conteneurs existants.
-
-Si `requirements.txt` ou le `Dockerfile` change, reconstruire :
-
-```powershell
-docker compose up -d --build
-```
-
-
-```powershell
-# Créer et activer Python 3.13
-py -3.13 -m venv .venv
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-
-# Installer les dépendances locales
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -r requirements.txt
-
-# Créer la configuration locale
-Copy-Item .\.env.example .\.env -Force
-
-# Valider et construire
-Docker compose config --quiet
-docker compose build dagster-webserver dagster-daemon dbt
-
-# Démarrer
-Docker compose up -d postgres dagster-webserver dagster-daemon
-
-# Vérifier
-Docker compose ps
-docker compose exec postgres pg_isready -U pipeline -d warehouse
-
-# Tester dbt
-docker compose --profile tools run --rm dbt --version
-```
-
-> Sous PowerShell, les commandes Docker ne sont pas sensibles à la casse, mais la forme recommandée reste `docker compose` en minuscules.
-
-
+- créer le modèle dbt `staging.stg_bdiff_incendies` ;
+- typer les 24 colonnes du CSV ;
+- construire les dimensions et la table de faits dans `marts` ;
+- ajouter les tests unitaires et d’intégration ;
+- automatiser l’ingestion avec un sensor Dagster ;
+- connecter Power BI aux tables du schéma `marts`.
