@@ -7,7 +7,7 @@
 |Date de dernière mise à jour affichée sur la fiche|Décembre 2025 |
 |Fréquence de mise à jour|Annuelle|
 |Volumétrie| Non vérifiée|
-|Clés disponibles| Aucune |
+|Clés disponibles| Non vérifiée |
 |Données personnelles| Aucune |
 |Licence| Ouverte |
 |Questions de votre analyse auxquelles elle pourrait répondre| Quels sont les impacts des moyens utilisés par le SDIS pour lutter contre les feux de forets ?|
