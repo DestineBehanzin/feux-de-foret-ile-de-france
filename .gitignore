@@ -218,3 +218,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dagster_home/history/
+dagster_home/logs/
+dbt/target/
+dbt/dbt_packages/
+data/incoming/*
+!data/incoming/.gitkeep
+data/archive/*
+!data/archive/.gitkeep
+data/rejected/*
+!data/rejected/.gitkeep

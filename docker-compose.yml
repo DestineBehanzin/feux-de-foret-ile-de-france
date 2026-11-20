@@ -1,11 +1,9 @@
 name: ${COMPOSE_PROJECT_NAME}
-
 services:
   postgres:
     image: ${POSTGRES_IMAGE}
     container_name: ${POSTGRES_CONTAINER_NAME}
-    env_file:
-      - .env
+    env_file: [.env]
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -15,12 +13,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/init:/docker-entrypoint-initdb.d:ro
-    networks:
-      - data_network
+    networks: [data_network]
     healthcheck:
-      test:
-        - CMD-SHELL
-        - pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: ${POSTGRES_HEALTHCHECK_INTERVAL}
       timeout: ${POSTGRES_HEALTHCHECK_TIMEOUT}
       retries: ${POSTGRES_HEALTHCHECK_RETRIES}
@@ -31,21 +26,23 @@ services:
       context: .
       dockerfile: ${PIPELINE_DOCKERFILE}
     container_name: ${DAGSTER_WEBSERVER_CONTAINER_NAME}
-    env_file:
-      - .env
+    env_file: [.env]
     command: >-
-      dagster-webserver
-      -h ${DAGSTER_HOST}
-      -p ${DAGSTER_PORT}
-      -w ${DAGSTER_WORKSPACE_PATH}
+      dagster-webserver -h ${DAGSTER_HOST} -p ${DAGSTER_PORT} -w ${DAGSTER_WORKSPACE_PATH}
     environment: &pipeline-env
       DAGSTER_HOME: ${DAGSTER_HOME}
       POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: ${POSTGRES_CONTAINER_PORT}
+      POSTGRES_CONTAINER_PORT: ${POSTGRES_CONTAINER_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       DATABASE_URL: ${DATABASE_URL}
+      CSV_SOURCES_CONFIG: ${CSV_SOURCES_CONFIG}
+      CSV_INCOMING_DIR: ${CSV_INCOMING_DIR}
+      CSV_ARCHIVE_DIR: ${CSV_ARCHIVE_DIR}
+      CSV_REJECTED_DIR: ${CSV_REJECTED_DIR}
+      CSV_DEFAULT_BATCH_SIZE: ${CSV_DEFAULT_BATCH_SIZE}
       DATA_GOUV_RESOURCE_ID: ${DATA_GOUV_RESOURCE_ID}
       DATA_GOUV_API_URL: ${DATA_GOUV_API_URL}
       API_PAGE_SIZE: ${API_PAGE_SIZE}
@@ -62,20 +59,17 @@ services:
       - "${DAGSTER_HOST_PORT}:${DAGSTER_PORT}"
     volumes:
       - ./src:/app/src
+      - ./config:/app/config:ro
       - ./dbt:/app/dbt
-      - ./data:/app/data:ro
+      - ./data/incoming:/app/data/incoming:ro
+      - ./data/archive:/app/data/archive
+      - ./data/rejected:/app/data/rejected
       - ./dagster_home:${DAGSTER_HOME}
-    networks:
-      - data_network
+    networks: [data_network]
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres: {condition: service_healthy}
     healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import os,socket; s=socket.create_connection(('localhost',int(os.environ['DAGSTER_PORT'])),5); s.close()"
+      test: ["CMD", "python", "-c", "import os,socket; s=socket.create_connection(('localhost',int(os.environ['DAGSTER_PORT'])),5); s.close()"]
       interval: ${DAGSTER_HEALTHCHECK_INTERVAL}
       timeout: ${DAGSTER_HEALTHCHECK_TIMEOUT}
       retries: ${DAGSTER_HEALTHCHECK_RETRIES}
@@ -87,20 +81,20 @@ services:
       context: .
       dockerfile: ${PIPELINE_DOCKERFILE}
     container_name: ${DAGSTER_DAEMON_CONTAINER_NAME}
-    env_file:
-      - .env
+    env_file: [.env]
     command: dagster-daemon run -w ${DAGSTER_WORKSPACE_PATH}
     environment: *pipeline-env
     volumes:
       - ./src:/app/src
+      - ./config:/app/config:ro
       - ./dbt:/app/dbt
-      - ./data:/app/data:ro
+      - ./data/incoming:/app/data/incoming:ro
+      - ./data/archive:/app/data/archive
+      - ./data/rejected:/app/data/rejected
       - ./dagster_home:${DAGSTER_HOME}
-    networks:
-      - data_network
+    networks: [data_network]
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres: {condition: service_healthy}
     restart: ${RESTART_POLICY}
 
   dbt:
@@ -108,30 +102,37 @@ services:
       context: .
       dockerfile: ${PIPELINE_DOCKERFILE}
     container_name: ${DBT_CONTAINER_NAME}
+
     profiles:
-      - ${DBT_PROFILE}
+      - "${DBT_PROFILE}"
+
     env_file:
       - .env
+
     working_dir: ${DBT_WORKING_DIR}
+
     entrypoint:
       - dbt
+
     command:
       - build
       - --profiles-dir
-      - ${DBT_PROFILES_DIR}
+      - "${DBT_PROFILES_DIR}"
+
     environment: *pipeline-env
+
     volumes:
       - ./dbt:${DBT_WORKING_DIR}
+
     networks:
       - data_network
+
     depends_on:
       postgres:
         condition: service_healthy
-
 volumes:
   postgres_data:
     name: ${POSTGRES_VOLUME_NAME}
-
 networks:
   data_network:
     name: ${DATA_NETWORK_NAME}

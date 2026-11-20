@@ -1,12 +1,12 @@
-name: movies_warehouse
+name: forest_fire_warehouse
 version: "1.0.0"
 config-version: 2
-profile: movies_warehouse
+profile: forest_fire_warehouse
 model-paths: ["models"]
 test-paths: ["tests"]
 clean-targets: ["target", "dbt_packages"]
 models:
-  movies_warehouse:
+  forest_fire_warehouse:
     staging:
       +schema: staging
       +materialized: view

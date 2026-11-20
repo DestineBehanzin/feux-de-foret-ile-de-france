@@ -1,0 +1,14 @@
+csv_sources:
+  - name: bdiff_incendies_2025
+    enabled: true
+    file_name: Incendies.csv
+    delimiter: ";"
+    encoding: "utf-8-sig"
+    fallback_encodings: ["utf-8", "cp1252", "latin-1"]
+    header_row: 3
+    skip_blank_rows: true
+    batch_size: 1000
+    archive_after_success: true
+    domain: bdiff
+    expected_column_count: 24
+    required_positions: [1, 2, 3, 4, 5, 6, 7]

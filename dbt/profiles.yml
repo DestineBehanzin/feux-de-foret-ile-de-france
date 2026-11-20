@@ -1,12 +1,12 @@
-movies_warehouse:
+forest_fire_warehouse:
   target: dev
   outputs:
     dev:
       type: postgres
       host: "{{ env_var('POSTGRES_HOST', 'postgres') }}"
-      port: 5432
+      port: "{{ env_var('POSTGRES_CONTAINER_PORT', '5432') | int }}"
       user: "{{ env_var('POSTGRES_USER', 'pipeline') }}"
-      password: "{{ env_var('POSTGRES_PASSWORD', 'pipeline_dev_only') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
       dbname: "{{ env_var('POSTGRES_DB', 'warehouse') }}"
       schema: analytics
       threads: 4
